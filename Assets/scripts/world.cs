@@ -5,11 +5,11 @@ using UnityEngine;
 public sealed class world
 {
     private static readonly world instance = new world();
-    private static GameObject[] hidingSports;
+    private static GameObject[] hidingSpots;
 
     static world()
     {
-        hidingSports = GameObject.FindGameObjectsWithTag("hide");
+        hidingSpots = GameObject.FindGameObjectsWithTag("hide");
     }
 
     private world() { }
@@ -19,8 +19,8 @@ public sealed class world
         get { return instance; }
     }
 
-    public GameObject[] GetHidingSports()
+    public GameObject[] GetHidingSpots()
     {
-        return hidingSports;
+        return hidingSpots;
     }
 }

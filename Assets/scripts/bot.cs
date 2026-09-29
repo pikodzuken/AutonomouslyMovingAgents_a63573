@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 using UnityEngine.AI;
 
@@ -8,7 +9,6 @@ public class bot : MonoBehaviour
     NavMeshAgent agent;
     public GameObject target;
     Drive ds;
-
     // Start is called before the first frame update
     void Start()
     {
@@ -30,14 +30,12 @@ public class bot : MonoBehaviour
     void Pursue()
     {
         Vector3 targetDir = target.transform.position - this.transform.position;
-
         float relativeHeading = Vector3.Angle(this.transform.forward, this.transform.TransformVector(target.transform.forward));
         float toTarget = Vector3.Angle(this.transform.forward, this.transform.TransformVector(targetDir));
-
-
         if((toTarget > 90 && relativeHeading < 20) || ds.currentSpeed < 0.01f)
         {
             Seek(target.transform.position);
+            return;
         }
 
         float lookAhead = targetDir.magnitude/(agent.speed + ds.currentSpeed);
@@ -51,8 +49,9 @@ public class bot : MonoBehaviour
         Flee(target.transform.position + target.transform.forward * lookAhead);
     }
 
+    
     Vector3 wanderTarget = Vector3.zero;
-    void Wander ()
+    void Wander()
     {
         float wanderRadius = 10;
         float wanderDistance = 10;
@@ -63,9 +62,9 @@ public class bot : MonoBehaviour
         wanderTarget *= wanderRadius;
 
         Vector3 targetLocal = wanderTarget + new Vector3(0, 0, wanderDistance);
-        Vector3 targetWorld = this.gameObject.transform.InverseTransformVector(targetLocal);
+        Vector3 targetworld = this.gameObject.transform.InverseTransformVector(targetLocal);
 
-        Seek(targetWorld);
+        Seek(targetworld);
     }
 
     void Hide()
@@ -73,10 +72,10 @@ public class bot : MonoBehaviour
         float dist = Mathf.Infinity;
         Vector3 chosenSpot = Vector3.zero;
 
-        for(int i = 0; i < world.Instance.GetHidingSports().Length; i++)
+        for(int i = 0; i < world.Instance.GetHidingSpots().Length; i++)
         {
-            Vector3 hideDir = world.Instance.GetHidingSports()[i].transform.position - target.transform.position;
-            Vector3 hidePos = world.Instance.GetHidingSports()[i].transform.position + hideDir.normalized * 10;
+            Vector3 hideDir = world.Instance.GetHidingSpots()[i].transform.position - target.transform.position;
+            Vector3 hidePos = world.Instance.GetHidingSpots()[i].transform.position + hideDir.normalized * 5;
 
             if(Vector3.Distance(this.transform.position, hidePos) < dist)
             {
@@ -84,7 +83,9 @@ public class bot : MonoBehaviour
                 dist = Vector3.Distance(this.transform.position, hidePos);
             }
         }
+
         Seek(chosenSpot);
+
     }
 
     void CleverHide()
@@ -92,47 +93,76 @@ public class bot : MonoBehaviour
         float dist = Mathf.Infinity;
         Vector3 chosenSpot = Vector3.zero;
         Vector3 chosenDir = Vector3.zero;
-        GameObject chosenGO = world.Instance.GetHidingSports()[0];
+        GameObject chosenGO = world.Instance.GetHidingSpots()[0];
 
-        for(int i = 0; i < world.Instance.GetHidingSports().Length; i++)
+        for(int i = 0; i < world.Instance.GetHidingSpots().Length; i++)
         {
-            Vector3 hideDir = world.Instance.GetHidingSports()[i].transform.position - target.transform.position;
-            Vector3 hidePos = world.Instance.GetHidingSports()[i].transform.position + hideDir.normalized * 10;
+            Vector3 hideDir = world.Instance.GetHidingSpots()[i].transform.position - target.transform.position;
+            Vector3 hidePos = world.Instance.GetHidingSpots()[i].transform.position + hideDir.normalized * 5;
 
             if(Vector3.Distance(this.transform.position, hidePos) < dist)
             {
                 chosenSpot = hidePos;
                 chosenDir = hideDir;
-                chosenGO = world.Instance.GetHidingSports()[i];
+                chosenGO = world.Instance.GetHidingSpots()[i];
                 dist = Vector3.Distance(this.transform.position, hidePos);
             }
         }
 
-        Collider hideCol =chosenGO.GetComponent<Collider>();
-        Ray backRay = new Ray(chosenSpot, -chosenDir.normalized);
+        Collider hideCol = chosenGO.GetComponent<Collider>();
+        Ray backRay =  new Ray(chosenSpot, -chosenDir.normalized);
         RaycastHit info;
         float distance = 100.0f;
         hideCol.Raycast(backRay, out info, distance);
 
-        Seek(info.point + chosenDir.normalized * 2);
+
+        Seek(info.point + chosenDir.normalized * 5);
+
     }
 
     bool CanSeeTarget()
     {
         RaycastHit raycastInfo;
         Vector3 rayToTarget = target.transform.position - this.transform.position;
-        if(Physics.Raycast(this.transform.position, rayToTarget, out raycastInfo))
+        float lookAngle = Vector3.Angle(this.transform.forward, rayToTarget);
+        if(lookAngle < 60 && Physics.Raycast(this.transform.position, rayToTarget, out raycastInfo))
         {
             if(raycastInfo.transform.gameObject.tag == "cop")
-                return true;
+            return true;
         }
         return false;
+    }
+
+
+    bool CanSeeMe()
+    {
+        Vector3 rayToTarget = this.transform.position - target.transform.position;
+        float lookAngle = Vector3.Angle(target.transform.forward, rayToTarget);
+
+        if (lookAngle < 60)
+            return true;
+        return false;
+    }
+
+    bool coolDown = false;
+    void BehaviourCooldown()
+    {
+        coolDown = false;
     }
 
     // Update is called once per frame
     void Update()
     {
-        if(CanSeeTarget())
-        CleverHide();
+        if (!coolDown)
+        {
+            if(CanSeeTarget() && CanSeeMe())
+            {
+                CleverHide();
+                coolDown = true;
+                Invoke("BehaviourCooldown", 5);
+            }
+            else
+                Pursue();
+        }
     }
 }
